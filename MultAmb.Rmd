@@ -1,0 +1,760 @@
+---
+title: "Ensaios em múltiplos ambientais"
+output:
+  html_document:
+    toc: yes
+    toc_float: yes
+    theme: flatly
+    highlight: haddock
+    fig_width: 10
+    fig_height: 8
+---
+
+```{=html}
+<style type="text/css">
+  body{
+  font-size: 11pt;
+}
+p {line-height: 2em;}
+</style>
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include=FALSE}
+write_matex <- function(x) {
+  begin <- "$$\\begin{bmatrix}"
+  end <- "\\end{bmatrix}$$"
+  X <-
+    apply(x, 1, function(x) {
+      paste(
+        paste(x, collapse = "&"),
+        "\\\\"
+      )
+    })
+  writeLines(c(begin, X, end))
+}
+
+write_matex2 <- function(x) {
+  begin <- "\\begin{bmatrix}"
+  end <- "\\end{bmatrix}"
+  X <-
+    apply(x, 1, function(x) {
+      paste(
+        paste(x, collapse = "&"),
+        "\\\\"
+      )
+    })
+  paste(c(begin, X, end), collapse = "")
+}
+```
+
+Neste documento estão os scripts para as análises abordadas no tópico "Ensaios em múltiplos ambientes". 
+
+# Pacotes necessários
+
+```{r message=FALSE, warning=FALSE,eval=FALSE,class.source="bg-primary",include=TRUE}
+require(tidyverse)
+require(asreml)
+require(gghighlight)
+require(ComplexHeatmap)
+require(RColorBrewer)
+require(ggrepel)
+```
+
+```{r eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE,include=FALSE}
+require(ggrepel)
+require(tidyverse)
+require(asreml)
+require(gghighlight)
+require(kableExtra)
+require(ComplexHeatmap)
+require(RColorBrewer)
+```
+
+# Modelagem das estruturas de covariância
+
+## Carregando o conjunto de dados
+
+```{r message=FALSE, warning=FALSE,class.source="bg-primary",include=TRUE}
+data1 = read.table("EstCov.txt", header = T)
+
+data1$amb = as.factor(data1$amb)
+data1$gen = as.factor(data1$gen)
+data1$rept = as.factor(data1$rept)
+
+```
+
+```{r eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE}
+data1 %>% kbl(escape = F, align = 'c') %>% 
+  kable_paper("hover",full_width = T, position="center") %>% scroll_box(height = '300px')
+```
+
+## Modelo 1: Simetria composta para genótipo e identidade para resíduo
+
+```{r message=FALSE, warning=FALSE,eval=TRUE,class.source="bg-primary",include=TRUE, results='hide'}
+
+m1 = asreml(fixed = y ~ rept:amb,
+            random = ~gen + gen:amb,
+            data = data1)
+summary(m1)$varcomp
+```
+
+```{r eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE}
+sum1 = summary(m1)$varcomp
+
+rownames(sum1) = c("$\\sigma^2_g$", "$\\sigma^2_{ga}$", "$\\sigma^2_e$")
+
+sum1[,1:3] %>% kbl(escape = F, align = 'c', col.names = c("Componente", "Erro-Padrão","Z-Ratio")) %>% 
+  kable_paper("hover",full_width = T, position="center")
+
+```
+
+
+## Modelo 2: Simetria composta para genótipo e bloco diagonal para resíduo
+
+```{r message=FALSE, warning=FALSE,eval=TRUE,class.source="bg-primary",include=TRUE, results='hide'}
+
+m2 = asreml(fixed = y ~ rept:amb,
+            random = ~gen + gen:amb,
+            residual = ~dsum(~id(units)|amb),
+            data = data1)
+summary(m2)$varcomp
+```
+
+```{r eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE}
+sum2 = summary(m2)$varcomp
+
+rownames(sum2) = c("$\\sigma^2_g$", "$\\sigma^2_{ga}$", "$\\sigma^2_{e1}$","$\\sigma^2_{e2}$","$\\sigma^2_{e3}$","$\\sigma^2_{e4}$")
+
+sum2[,1:3] %>% kbl(escape = F, align = 'c', col.names = c("Componente", "Erro-Padrão","Z-Ratio")) %>% 
+  kable_paper("hover",full_width = T, position="center")
+
+```
+
+## Modelo 3: Simetria composta heterogênea para genótipo e bloco diagonal para resíduo
+
+```{r message=FALSE, warning=FALSE,eval=TRUE,class.source="bg-primary",include=TRUE, results='hide'}
+
+m3 = asreml(fixed = y ~ rept:amb,
+            random = ~corh(amb):gen,
+            residual = ~dsum(~id(units)|amb),
+            data = data1)
+summary(m3)$varcomp
+```
+
+```{r eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE}
+sum3 = summary(m3)$varcomp
+
+rownames(sum3) = c("$\\rho$","$\\sigma^2_{g1}$", "$\\sigma^2_{g2}$","$\\sigma^2_{g3}$","$\\sigma^2_{g4}$", "$\\sigma^2_{e1}$","$\\sigma^2_{e2}$","$\\sigma^2_{e3}$","$\\sigma^2_{e4}$")
+
+sum3[,1:3] %>% kbl(escape = F, align = 'c', col.names = c("Componente", "Erro-Padrão","Z-Ratio")) %>% 
+  kable_paper("hover",full_width = T, position="center")
+
+```
+
+
+## Modelo 4: Estrutura multivariada para genótipo e bloco diagonal para resíduo
+
+```{r message=FALSE, warning=FALSE,eval=TRUE,class.source="bg-primary",include=TRUE, results='hide'}
+
+m4 = asreml(fixed = y ~ rept:amb,
+            random = ~us(amb):gen,
+            residual = ~dsum(~id(units)|amb),
+            data = data1)
+summary(m4)$varcomp
+```
+
+```{r eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE}
+sum4 = summary(m4)$varcomp
+
+rownames(sum4) = c("$\\sigma^2_{g1}$","$\\sigma^2_{g12}$","$\\sigma^2_{g2}$","$\\sigma^2_{g13}$","$\\sigma^2_{g23}$","$\\sigma^2_{g3}$","$\\sigma^2_{g14}$","$\\sigma^2_{g24}$","$\\sigma^2_{g34}$","$\\sigma^2_{g4}$","$\\sigma^2_{e1}$","$\\sigma^2_{e2}$","$\\sigma^2_{e3}$","$\\sigma^2_{e4}$")
+
+sum4[,1:3] %>% kbl(escape = F, align = 'c', col.names = c("Componente", "Erro-Padrão","Z-Ratio")) %>% 
+  kable_paper("hover",full_width = T, position="center")
+
+```
+
+
+## Seleção do modelo
+
+```{r message=FALSE, warning=FALSE,eval=TRUE,class.source="bg-primary",include=TRUE, results='hide'}
+
+data.frame("Modelo" = seq(1,4),
+           "AIC" = c(summary(m1)$aic,summary(m2)$aic,summary(m3)$aic,summary(m4)$aic))
+
+```
+
+```{r eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE}
+data.frame("Modelo" = seq(1,4),
+           "AIC" = c(summary(m1)$aic,summary(m2)$aic,summary(m3)$aic,summary(m4)$aic)) %>% kbl(escape = F, align = 'c', col.names = c("Modelo", "AIC")) %>% 
+  kable_paper("hover",full_width = T, position="center")
+
+```
+O modelo 4 possui o menor AIC e, portanto, o melhor ajuste.
+
+
+# Modelos Fator Analítico Multiplicativo Misto
+
+## Carregando o conjunto de dados
+
+Neste exemplo, utilizamos o conjunto de dados presente neste [link](https://github.com/Kaio-Olimpio/Probability-for-GEI/blob/master/maize_dataset.csv)
+
+```{r message=FALSE, warning=FALSE,class.source="bg-primary",include=TRUE}
+dataset = read.csv("https://raw.githubusercontent.com/Kaio-Olimpio/Probability-for-GEI/master/maize_dataset.csv", sep = ",")
+
+dataset <- transform(dataset, env = factor(Location), gen = factor(Hybrid), rept = factor(Rep), 
+                     block = factor(Block))
+dataset[,1:6] %>% kbl(align = "c", longtable = T, 
+                      col.names = c("Região","Local","Rept",
+                                    "Bloco","Híbrido", "GY")) %>%
+  kable_styling(c("striped", "hover"), full_width = F, position = "center") %>%
+  scroll_box(height = "500px")
+
+num.env = nlevels(factor(dataset$env))
+num.gen = nlevels(factor(dataset$gen))
+name.env = levels(factor(dataset$env))
+name.gen = levels(factor(dataset$gen))
+
+```
+
+## Seleção do modelo
+
+Procuramos um modelo parsimonioso, mas que garanta a explicação de uma grande parte da variação do conjunto de dados. Em termos práticos, adotamos um limite mínimo de 70% em termos de variação explicada pelo modelo. Neste exemplo, já partiremos da estrutura diagonal para os efeitos residuais.
+
+```{r message=FALSE, warning=FALSE, class.source="bg-primary", include=FALSE, echo=TRUE}
+
+m1 = asreml(fixed=GY~1 + rept:env + env,
+            random=~fa(env,1):gen  + diag(env):block,
+            residual= ~dsum(~id(units)|env),
+            data=dataset,
+            maxiter=100)
+m2 = asreml(fixed=GY~1 + rept:env + env,
+            random=~fa(env,2):gen  + diag(env):block,
+            residual= ~dsum(~id(units)|env),
+            data=dataset,
+            maxiter=100)
+m3 = asreml(fixed=GY~1 + rept:env + env,
+            random=~fa(env,3):gen  + diag(env):block,
+            residual= ~dsum(~id(units)|env),
+            data=dataset,
+            maxiter=100)
+m4 = asreml(fixed=GY~1 + rept:env + env,
+            random=~fa(env,4):gen  + diag(env):block,
+            residual= ~dsum(~id(units)|env),
+            data=dataset,
+            maxiter=100)
+m5 = asreml(fixed=GY~1 + rept:env + env,
+            random=~fa(env,5):gen  + diag(env):block,
+            residual= ~dsum(~id(units)|env),
+            data=dataset,
+            maxiter=100)
+
+```
+
+```{r message=FALSE, warning=FALSE, class.source="bg-primary", include=TRUE, echo=FALSE}
+
+aicm1 = summary(m1)$aic
+sum1 = summary(m1)$varcomp
+fa1.loadings = sum1[grep('fa1', rownames(sum1)),1]
+spvar = as.matrix(diag(sum1[grep("var",row.names(sum1)),1]))
+lamblamb = fa1.loadings %*% t(fa1.loadings)
+expvar1 = (sum(diag(lamblamb))/sum(diag(lamblamb + spvar)))*100
+
+aicm2 = summary(m2)$aic
+sum2 = summary(m2)$varcomp
+fa1.loadings = sum2[grep('fa1', rownames(sum2)),1]
+fa2.loadings = sum2[grep('fa2', rownames(sum2)),1]
+mat.loadings2 = as.matrix(cbind(fa1.loadings, fa2.loadings))
+spvar = as.matrix(diag(sum2[grep("var",row.names(sum2)),1]))
+lamblamb = mat.loadings2 %*% t(mat.loadings2)
+expvar2 = (sum(diag(lamblamb))/sum(diag(lamblamb + spvar)))*100
+svdmat = svd(mat.loadings2)
+mat.loadings2.star = -1*mat.loadings2 %*% svdmat$v
+lamblamb.star = mat.loadings2.star %*% t(mat.loadings2.star)
+expvar2.star = (sum(diag(lamblamb.star))/sum(diag(lamblamb.star + spvar)))*100
+
+aicm3 = summary(m3)$aic
+bicm3 = summary(m3)$bic
+sum3 = summary(m3)$varcomp
+fa1.loadings = sum3[grep('fa1', rownames(sum3)),1]
+fa2.loadings = sum3[grep('fa2', rownames(sum3)),1]
+fa3.loadings = sum3[grep('fa3', rownames(sum3)),1]
+mat.loadings3 = as.matrix(cbind(fa1.loadings, fa2.loadings,fa3.loadings))
+spvar = as.matrix(diag(sum3[grep("var",row.names(sum3)),1]))
+lamblamb = mat.loadings3 %*% t(mat.loadings3)
+expvar3 = (sum(diag(lamblamb))/sum(diag(lamblamb + spvar)))*100
+svdmat = svd(mat.loadings3)
+mat.loadings3.star = -1*mat.loadings3 %*% svdmat$v
+lamblamb.star = mat.loadings3.star %*% t(mat.loadings3.star)
+expvar3.star = (sum(diag(lamblamb.star))/sum(diag(lamblamb.star + spvar)))*100
+
+aicm4 = summary(m4)$aic
+bicm4 = summary(m4)$bic
+sum4 = summary(m4)$varcomp
+fa1.loadings = sum4[grep('fa1', rownames(sum4)),1]
+fa2.loadings = sum4[grep('fa2', rownames(sum4)),1]
+fa3.loadings = sum4[grep('fa3', rownames(sum4)),1]
+fa4.loadings = sum4[grep('fa4', rownames(sum4)),1]
+mat.loadings4 = as.matrix(cbind(fa1.loadings, fa2.loadings,fa3.loadings,fa4.loadings))
+spvar = as.matrix(diag(sum4[grep("var",row.names(sum4)),1]))
+lamblamb = mat.loadings4 %*% t(mat.loadings4)
+expvar4 = (sum(diag(lamblamb))/sum(diag(lamblamb + spvar)))*100
+svdmat = svd(mat.loadings4)
+mat.loadings4.star = -1*mat.loadings4 %*% svdmat$v
+lamblamb.star = mat.loadings4.star %*% t(mat.loadings4.star)
+expvar4.star = (sum(diag(lamblamb.star))/sum(diag(lamblamb.star + spvar)))*100
+
+aicm5 = summary(m5)$aic
+sum5 = summary(m5)$varcomp
+fa1.loadings = sum5[grep('fa1', rownames(sum5)),1]
+fa2.loadings = sum5[grep('fa2', rownames(sum5)),1]
+fa3.loadings = sum5[grep('fa3', rownames(sum5)),1]
+fa4.loadings = sum5[grep('fa4', rownames(sum5)),1]
+fa5.loadings = sum5[grep('fa5', rownames(sum5)),1]
+mat.loadings5 = as.matrix(cbind(fa1.loadings, fa2.loadings,fa3.loadings,
+                                fa4.loadings,fa5.loadings))
+spvar = as.matrix(diag(sum5[grep("var",row.names(sum5)),1]))
+lamblamb = mat.loadings5 %*% t(mat.loadings5)
+expvar5 = (sum(diag(lamblamb))/sum(diag(lamblamb + spvar)))*100
+svdmat = svd(mat.loadings5)
+mat.loadings5.star = -1*mat.loadings5 %*% svdmat$v
+lamblamb.star = mat.loadings5.star %*% t(mat.loadings5.star)
+expvar5.star = (sum(diag(lamblamb.star))/sum(diag(lamblamb.star + spvar)))*100
+
+
+fit = data.frame("Model" = c('FA1', 'FA2','FA3','FA4','FA5'),
+                 'AIC' = c(aicm1, aicm2, aicm3, aicm4, aicm5),
+                 'ExpVar.Star' = c(expvar1, expvar2.star,expvar3.star,expvar4.star,expvar5.star))
+fit %>%  kbl(escape = F, align = 'c',col.names = c("Modelo","AIC","Variância explicada (%)")) %>% 
+  kable_paper("hover",full_width = T, position="center", fixed_thead = T)
+
+```
+Dentre os modelos testados, o FA5 possui a maior variância explicada, apesar do maior valor de AIC. Prosseguiremos com a utilização deste modelo para as demais etapas.
+
+## Obtenção da matriz de covariâncias genéticas
+
+### Matriz de cargas fatoriais 
+
+```{r message=FALSE, warning=FALSE, class.source="bg-primary", include=TRUE, echo=TRUE}
+
+sum5 = summary(m5)$varcomp
+fa1.loadings = sum5[grep('fa1', rownames(sum5)),1]
+fa2.loadings = sum5[grep('fa2', rownames(sum5)),1]
+fa3.loadings = sum5[grep('fa3', rownames(sum5)),1]
+fa4.loadings = sum5[grep('fa4', rownames(sum5)),1]
+fa5.loadings = sum5[grep('fa5', rownames(sum5)),1]
+mat.loadings5 = as.matrix(cbind(fa1.loadings, fa2.loadings,fa3.loadings,
+                                fa4.loadings,fa5.loadings))
+
+```
+
+$$\boldsymbol \Lambda = \begin{bmatrix}
+0.699&0&0&0&0 \\
+0.375&-0.384&0&0&0 \\
+1.054&0.05&-0.885&0&0 \\
+0.619&-0.122&-0.194&-0.131&0 \\
+0.446&-0.383&-0.193&0.026&0.027 \\
+0.499&0.609&0.21&0.197&0.376 \\
+0.198&-0.169&-0.18&-0.627&0.208 \\
+0.559&-0.185&0.509&0.157&0.372 \\
+-0.002&-0.112&0.016&-0.186&0.168 \\
+0.333&0.48&0.125&-0.235&0.914 \\
+0.813&0.449&0.691&-0.708&-0.828 \\
+0.111&0.169&-0.2&-0.193&0.177 \\
+-0.017&0.069&-0.051&-0.354&0.072 \\
+0.281&-0.325&-0.071&-0.338&0.008 \\
+0.696&-0.211&0.247&-0.37&-0.227 \\
+0.165&-0.443&-0.107&-0.311&0.009 \\
+\end{bmatrix}$$
+
+
+### Rotação da matriz de cargas fatoriais
+```{r message=FALSE, warning=FALSE, class.source="bg-primary", include=TRUE, echo=TRUE}
+
+svdmat = svd(mat.loadings5)
+mat.loadings5.star = -1*mat.loadings5 %*% svdmat$v
+
+
+```
+
+$$\boldsymbol \Lambda^* = \begin{bmatrix}
+0.657&-0.11&0.045&-0.14&0.152 \\
+0.349&-0.116&-0.244&0.094&0.29 \\
+0.978&-0.738&-0.297&-0.483&-0.271 \\
+0.622&-0.206&-0.148&-0.039&0.019 \\
+0.402&-0.279&-0.309&0.021&0.22 \\
+0.387&-0.157&0.778&-0.249&0.047 \\
+0.378&-0.138&-0.148&0.501&-0.318 \\
+0.455&-0.075&0.354&0.197&0.626 \\
+0.049&-0.066&-0.003&0.261&-0.026 \\
+0.339&-0.444&0.877&0.372&-0.171 \\
+1.069&1.142&0.153&-0.115&-0.205 \\
+0.156&-0.187&0.107&0.063&-0.272 \\
+0.098&0.03&0.021&0.228&-0.274 \\
+0.373&-0.049&-0.276&0.293&-0.003 \\
+0.794&0.276&-0.156&0.153&0.153 \\
+0.253&-0.081&-0.379&0.341&0.033 \\
+\end{bmatrix}$$
+
+### Matriz de variâncias específicas
+
+```{r message=FALSE, warning=FALSE, class.source="bg-primary", include=TRUE, echo=TRUE}
+
+spvar = as.matrix(diag(sum5[grep("var",row.names(sum5)),1]))
+
+```
+
+$$\boldsymbol \Psi=\begin{bmatrix}
+0.119&0&0&0&0&0&0&0&0&0&0&0&0&0&0&0 \\
+0&0&0&0&0&0&0&0&0&0&0&0&0&0&0&0 \\
+0&0&0&0&0&0&0&0&0&0&0&0&0&0&0&0 \\
+0&0&0&0.018&0&0&0&0&0&0&0&0&0&0&0&0 \\
+0&0&0&0&0&0&0&0&0&0&0&0&0&0&0&0 \\
+0&0&0&0&0&0&0&0&0&0&0&0&0&0&0&0 \\
+0&0&0&0&0&0&0.115&0&0&0&0&0&0&0&0&0 \\
+0&0&0&0&0&0&0&0&0&0&0&0&0&0&0&0 \\
+0&0&0&0&0&0&0&0&0.511&0&0&0&0&0&0&0 \\
+0&0&0&0&0&0&0&0&0&0.596&0&0&0&0&0&0 \\
+0&0&0&0&0&0&0&0&0&0&0&0&0&0&0&0 \\
+0&0&0&0&0&0&0&0&0&0&0&0&0&0&0&0 \\
+0&0&0&0&0&0&0&0&0&0&0&0&0&0&0&0 \\
+0&0&0&0&0&0&0&0&0&0&0&0&0&0.088&0&0 \\
+0&0&0&0&0&0&0&0&0&0&0&0&0&0&0&0 \\
+0&0&0&0&0&0&0&0&0&0&0&0&0&0&0&0.347 \\
+\end{bmatrix}$$
+
+### Matriz de covariâncias genéticas
+
+```{r message=FALSE, warning=FALSE, class.source="bg-primary", include=TRUE, echo=TRUE}
+
+gencov = mat.loadings5.star %*% t(mat.loadings5.star) + spvar
+
+```
+
+$$\boldsymbol \Sigma_g = \begin{bmatrix}
+0.607&0.262&0.736&0.433&0.311&0.349&0.138&0.391&-0.001&0.233&0.568&0.078&-0.012&0.196&0.486&0.115 \\
+0.262&0.288&0.376&0.279&0.314&-0.046&0.139&0.281&0.042&-0.059&0.132&-0.023&-0.033&0.23&0.342&0.232 \\
+0.736&0.376&1.897&0.818&0.621&0.37&0.359&0.13&-0.022&0.265&0.268&0.303&0.032&0.342&0.504&0.246 \\
+0.433&0.279&0.818&0.472&0.357&0.168&0.26&0.25&0.034&0.154&0.408&0.112&0.038&0.272&0.457&0.217 \\
+0.311&0.314&0.621&0.357&0.384&-0.036&0.177&0.236&0.039&-0.041&0.017&0.023&-0.031&0.255&0.328&0.256 \\
+0.349&-0.046&0.37&0.168&-0.036&0.844&-0.087&0.444&-0.039&0.782&0.374&0.145&-0.02&-0.136&0.112&-0.268 \\
+0.138&0.139&0.359&0.26&0.177&-0.087&0.652&0.029&0.167&0.3&0.231&0.187&0.232&0.337&0.313&0.324 \\
+0.391&0.281&0.13&0.25&0.236&0.444&0.029&0.768&0.061&0.464&0.304&-0.035&-0.077&0.131&0.411&0.074 \\
+-0.001&0.042&-0.022&0.034&0.039&-0.039&0.167&0.061&0.587&0.145&-0.048&0.043&0.07&0.099&0.057&0.107 \\
+0.233&-0.059&0.265&0.154&-0.041&0.782&0.3&0.464&0.145&1.844&-0.018&0.3&0.17&0.015&0.04&-0.09 \\
+0.568&0.132&0.268&0.408&0.017&0.374&0.231&0.304&-0.048&-0.018&2.527&0.018&0.173&0.267&1.091&0.074 \\
+0.078&-0.023&0.303&0.112&0.023&0.145&0.187&-0.035&0.043&0.3&0.018&0.149&0.101&0.057&0.024&0.026 \\
+-0.012&-0.033&0.032&0.038&-0.031&-0.02&0.232&-0.077&0.07&0.17&0.173&0.101&0.138&0.097&0.076&0.083 \\
+0.196&0.23&0.342&0.272&0.255&-0.136&0.337&0.131&0.099&0.015&0.267&0.057&0.097&0.392&0.37&0.303 \\
+0.486&0.342&0.504&0.457&0.328&0.112&0.313&0.411&0.057&0.04&1.091&0.024&0.076&0.37&0.778&0.295 \\
+0.115&0.232&0.246&0.217&0.256&-0.268&0.324&0.074&0.107&-0.09&0.074&0.026&0.083&0.303&0.295&0.679 \\
+\end{bmatrix}$$
+
+## Correlações genéticas entre ambientes
+```{r message=FALSE, warning=FALSE, class.source="bg-primary", include=TRUE, echo=TRUE}
+
+rownames(gencov) = colnames(gencov) = name.env
+
+corr = cov2cor(gencov)
+
+Heatmap(corr,col=colorRampPalette(brewer.pal(8, "YlOrBr"))(25),
+        column_dend_height = unit(2, "cm"), 
+        clustering_method_rows = "complete",
+        row_dend_width = unit(2, "cm"), 
+        clustering_method_columns = "complete",
+        heatmap_legend_param = list(title="Correlation",
+                                    at=c(-1,0,1),labels=c("-1","0","1")),
+        row_names_gp = gpar(fontsize = 11),
+        column_names_gp = gpar(fontsize = 11))
+
+```
+
+
+## Obtenção dos EBLUPs
+
+### Vetor de escores fatoriais
+
+```{r message=FALSE, warning=FALSE, class.source="bg-primary", include=TRUE, echo=TRUE}
+
+coef5 = summary(m5,coef = T)$coef.random
+
+fa1.scores = coef5[grep("Comp1",row.names(coef5)),1];
+names(fa1.scores) = sub("fa(env, 4)_Comp1:gen_","",names(fa1.scores),fixed=T)
+fa2.scores = coef5[grep("Comp2",row.names(coef5)),1];
+names(fa2.scores) = sub("fa(env, 4)_Comp2:gen_","",names(fa2.scores),fixed=T)
+fa3.scores = coef5[grep("Comp3",row.names(coef5)),1];
+names(fa3.scores) = sub("fa(env, 4)_Comp3:gen_","",names(fa3.scores),fixed=T)
+fa4.scores = coef5[grep("Comp4",row.names(coef5)),1];
+names(fa4.scores) = sub("fa(env, 4)_Comp4:gen_","",names(fa4.scores),fixed=T)
+fa5.scores = coef5[grep("Comp4",row.names(coef5)),1];
+names(fa5.scores) = sub("fa(env, 4)_Comp4:gen_","",names(fa5.scores),fixed=T)
+
+fa.scores = rbind(as.matrix(fa1.scores),as.matrix(fa2.scores),as.matrix(fa3.scores),
+                  as.matrix(fa4.scores),as.matrix(fa5.scores))
+
+```
+
+
+$$\boldsymbol f = \begin{bmatrix}
+2.003 \\
+-0.933 \\
+-0.759 \\
+0.071 \\
+0.041 \\
+-0.31 \\
+-1.387 \\
+0.03 \\
+0.58 \\
+-0.519 \\
+-1.261 \\
+\vdots \\
+-2.245 \\
+\end{bmatrix}$$
+
+### Rotação do vetor de escores fatoriais 
+
+```{r message=FALSE, warning=FALSE, class.source="bg-primary", include=TRUE, echo=TRUE}
+
+fa.scores.star = -kronecker(t(svdmat$v), diag(num.gen))%*%fa.scores 
+rownames(fa.scores.star) = rep(name.gen,5)
+
+fa1.scores.star = fa.scores.star[1:num.gen,1]
+fa2.scores.star = fa.scores.star[(num.gen+1):(num.gen*2),1]
+fa3.scores.star = fa.scores.star[(num.gen*2+1):(num.gen*3),1]
+fa4.scores.star = fa.scores.star[(num.gen*3+1):(num.gen*4),1]
+fa5.scores.star = fa.scores.star[(num.gen*4+1):(num.gen*5),1]
+
+```
+
+$$\boldsymbol f^* = \begin{bmatrix}
+1.846 \\
+-1.503 \\
+-0.679 \\
+0.238 \\
+0.895 \\
+-0.319 \\
+-1.288 \\
+-0.023 \\
+0.503 \\
+-0.137 \\
+-1.386 \\
+\vdots \\
+-1.922 \\
+\end{bmatrix}$$
+
+### EBLUPs marginais
+
+```{r message=FALSE, warning=FALSE, class.source="bg-primary", include=TRUE, echo=TRUE}
+
+EBLUPs_marg = (kronecker(mat.loadings5.star,diag(num.gen))) %*% fa.scores.star 
+EBLUPs_marg = data.frame("Environment" = rep(name.env,each = num.gen),
+                         "Gen" = rep(name.gen,num.env),
+                         "EBLUP_marg" = EBLUPs_marg);EBLUPs_marg %>% 
+  kbl(escape = F, align = 'c',col.names = c("Ambiente","Genótipo","EBLUP marginal")) %>% 
+  kable_paper("hover",full_width = T, position="center", fixed_thead = T) %>%
+  scroll_box(height = "500px")
+
+```
+
+
+## Regressões latentes
+
+```{r message=FALSE, warning=FALSE, class.source="bg-primary",echo=TRUE, dev='svg'}
+
+EBLUPs_marg$FL_1 = rep(mat.loadings5.star[,1], each = num.gen)
+ggplot(subset(EBLUPs_marg, Gen %in% c("G9","G32","G20","G23")), 
+       aes(x=FL_1,y=EBLUP_marg,colour=Gen))+
+  geom_smooth(aes(x=FL_1,y=EBLUP_marg),method=lm, fill = NA)+
+  facet_wrap(~Gen, ncol = 4, as.table = T, dir = 'v', scales = 'free_x')+
+  geom_vline(xintercept = mean(mat.loadings5.star[,1]),linetype="dashed") + 
+  geom_point()+
+  xlab("Cargas do primeiro fator")+ylab("EBLUP")+
+  labs(color = "Genótipo", title = "EBLUP x Cargas do primeiro fator")
+
+EBLUPs_marg$EBLUPs_marg_f2 = EBLUPs_marg$EBLUP_marg - 
+  (kronecker(mat.loadings5.star[,1],diag(num.gen))) %*%
+  as.matrix(fa1.scores.star)
+EBLUPs_marg$FL_2 = rep(mat.loadings5.star[,2], each = num.gen)
+
+ggplot(subset(EBLUPs_marg, Gen %in% c("G9","G32","G20","G23")), 
+       aes(x=FL_2,y=EBLUPs_marg_f2,colour=Gen))+
+  geom_smooth(aes(x=FL_2,y=EBLUPs_marg_f2),method=lm, fill = NA)+
+  facet_wrap(~Gen, ncol = 4, as.table = T, dir = 'v', scales = 'free_x')+
+  geom_vline(xintercept = mean(mat.loadings5.star[,1]),linetype="dashed") + 
+  geom_point()+
+  xlab("Cargas do segundo fator")+
+  ylab(expression(EBLUP[m] - lambda[1]^'*' * f[1]^'*'))+
+  labs(color = "Genótipo", title = "EBLUP x Cargas do segundo fator")
+
+EBLUPs_marg$EBLUPs_marg_f3 = EBLUPs_marg$EBLUP_marg - 
+  ((kronecker(mat.loadings5.star[,1],diag(num.gen)))
+   %*% as.matrix(fa1.scores.star)+
+     (kronecker(mat.loadings5.star[,2],diag(num.gen))) 
+   %*% as.matrix(fa2.scores.star))
+EBLUPs_marg$FL_3 = rep(mat.loadings5.star[,3], each = num.gen)
+
+ggplot(subset(EBLUPs_marg, Gen %in% c("G9","G32","G20","G23")), 
+       aes(x=FL_3,y=EBLUPs_marg_f3,colour=Gen))+
+  geom_smooth(aes(x=FL_3,y=EBLUPs_marg_f3),method=lm, fill = NA)+
+  facet_wrap(~Gen, ncol = 4, as.table = T, dir = 'v', scales = 'free_x')+
+  geom_vline(xintercept = mean(mat.loadings5.star[,3]),linetype="dashed") + 
+  geom_point()+
+  xlab("Cargas do terceiro fator")+
+  ylab(expression(EBLUP[m] - (lambda[1]^'*' * f[1]^'*' + 
+                                lambda[2]^'*' * f[2]^'*')))+
+  labs(color = "Genótipo",title = "EBLUP x Cargas do terceiro fator")
+
+
+EBLUPs_marg$EBLUPs_marg_f4 = EBLUPs_marg$EBLUP_marg - 
+  ((kronecker(mat.loadings5.star[,1],diag(num.gen))) 
+   %*% as.matrix(fa1.scores.star)+
+     (kronecker(mat.loadings5.star[,2],diag(num.gen))) 
+   %*% as.matrix(fa2.scores.star) + 
+     (kronecker(mat.loadings5.star[,3],diag(num.gen))) 
+   %*% as.matrix(fa3.scores.star))
+EBLUPs_marg$FL_4 = rep(mat.loadings5.star[,4], each = num.gen)
+
+ggplot(subset(EBLUPs_marg, Gen %in% c("G9","G32","G20","G23")), 
+       aes(x=FL_4,y=EBLUPs_marg_f4,colour=Gen))+
+  geom_smooth(aes(x=FL_4,y=EBLUPs_marg_f4),method=lm, fill = NA)+
+  facet_wrap(~Gen, ncol = 4, as.table = T, dir = 'v', scales = 'free_x')+
+  geom_vline(xintercept = mean(mat.loadings5.star[,3]),linetype="dashed") + 
+  geom_point()+
+  xlab("Cargas do quarto fator")+
+  ylab(expression(EBLUP[m] - (lambda[1]^'*' * f[1]^'*' +
+lambda[2]^'*' * f[2]^'*' + lambda[3]^'*' * f[3]^'*')))+ 
+  labs(color = "Genótipo",title = "EBLUP x Cargas do quarto fator")
+
+
+EBLUPs_marg$EBLUPs_marg_f5 = EBLUPs_marg$EBLUP_marg - 
+  ((kronecker(mat.loadings5.star[,1],diag(num.gen))) %*%
+     as.matrix(fa1.scores.star)+
+     (kronecker(mat.loadings5.star[,2],diag(num.gen))) %*%
+     as.matrix(fa2.scores.star) + 
+     (kronecker(mat.loadings5.star[,3],diag(num.gen))) %*% 
+     as.matrix(fa3.scores.star) +
+     (kronecker(mat.loadings5.star[,4],diag(num.gen))) %*% 
+     as.matrix(fa4.scores.star))
+EBLUPs_marg$FL_5 = rep(mat.loadings5.star[,5], each = num.gen)
+
+ggplot(subset(EBLUPs_marg, Gen %in% c("G9","G32","G20","G23")), 
+       aes(x=FL_5,y=EBLUPs_marg_f5,colour=Gen))+
+  geom_smooth(aes(x=FL_5,y=EBLUPs_marg_f5),method=lm, fill = NA)+
+  facet_wrap(~Gen, ncol = 4, as.table = T, dir = 'v', scales = 'free_x')+
+  geom_vline(xintercept = mean(mat.loadings5.star[,3]),linetype="dashed") + 
+  geom_point()+
+  xlab("Cargas do quinto fator")+
+  ylab(expression(EBLUP[m] - (lambda[1]^'*' * f[1]^'*' +
+lambda[2]^'*' * f[2]^'*' + lambda[3]^'*' * f[3]^'*' +
+  lambda[4]^'*' * f[4]^'*')))+ 
+  labs(color = "Genótipo",title = "EBLUP x Cargas do quinto fator")
+```
+
+## Ferramentas de seleção
+
+### Performance geral x Estabilidade
+
+Os limites para seleção dos genótipos fica a critério do melhorista. Neste exemplo, nosso interesse foi selecionar os cinco melhores. Portanto, definimos que fossem destacados os genótipos com a PG maior ou igual a 0.25 e a ST menor ou igual a 0.5
+
+```{r message=FALSE, warning=FALSE, class.source="bg-primary", include=TRUE, echo=TRUE}
+
+PG = mean(mat.loadings5.star[,1]) * as.matrix(fa1.scores.star)
+rest = (EBLUPs_marg$EBLUP_marg - 
+          (kronecker(mat.loadings5.star[,1],diag(num.gen))) %*%
+          fa1.scores.star)^2
+STA = data.frame("gen" = rep(name.gen, num.env),
+                 "ST" = rest)
+STA = STA %>% group_by(gen) %>% summarise(ST = sqrt(mean(ST)))
+plot1 = data.frame("gen"=name.gen,
+                   "PG" = PG,
+                   "ST" = STA$ST)
+
+ggplot(data=plot1)+
+  geom_point(aes(x = ST, y = PG, color=gen),size=2)+
+  geom_vline(xintercept = 0,linetype="dashed", colour = "black")+
+  geom_hline(yintercept = 0,linetype="dashed")+
+  scale_x_continuous(name = "Estabilidade", limits = c(0,1))+
+  ylab("Performance Geral") +
+   gghighlight(max(ST)<=0.50,max(PG)>=0.25,use_direct_label = F)+
+  geom_label_repel(aes(x = ST, y = PG, label = gen), size = 4, box.padding = 1)+
+  labs(color = "Genótipo")
+
+```
+
+
+### Performance geral x Responsividade aos fatores
+
+```{r message=FALSE, warning=FALSE, class.source="bg-primary", include=TRUE, echo=TRUE}
+
+mat.loadings5.star.df = as.data.frame(mat.loadings5.star)
+
+colnames(mat.loadings5.star.df) = c("fa1.loadings","fa2.loadings","fa3.loadings","fa4.loadings","fa5.loadings")
+
+fa2.mednegload = mean(mat.loadings5.star.df[mat.loadings5.star.df$fa2.loadings <0,]$fa2.loadings)
+fa3.mednegload = mean(mat.loadings5.star.df[mat.loadings5.star.df$fa3.loadings <0,]$fa3.loadings)
+fa4.mednegload = mean(mat.loadings5.star.df[mat.loadings5.star.df$fa4.loadings <0,]$fa4.loadings)
+fa5.mednegload = mean(mat.loadings5.star.df[mat.loadings5.star.df$fa5.loadings <0,]$fa5.loadings)
+
+fa2.medposload = mean(mat.loadings5.star.df[mat.loadings5.star.df$fa2.loadings >0,]$fa2.loadings)
+fa3.medposload = mean(mat.loadings5.star.df[mat.loadings5.star.df$fa3.loadings >0,]$fa3.loadings)
+fa4.medposload = mean(mat.loadings5.star.df[mat.loadings5.star.df$fa4.loadings >0,]$fa4.loadings)
+fa5.medposload = mean(mat.loadings5.star.df[mat.loadings5.star.df$fa5.loadings >0,]$fa5.loadings)
+
+
+respfa2 = (fa2.medposload-fa2.mednegload)*fa2.scores.star
+respfa3 = (fa3.medposload-fa3.mednegload)*fa3.scores.star
+respfa4 = (fa4.medposload-fa4.mednegload)*fa4.scores.star
+respfa5 = (fa5.medposload-fa5.mednegload)*fa5.scores.star
+
+
+plot2 = data.frame("gen" = name.gen,
+                   "PG" = PG,
+                   "respfa2" = respfa2,
+                   "respfa3" = respfa3,
+                   "respfa4" = respfa4,
+                   "respfa5" = respfa5)
+
+ggplot(data=plot2)+
+  geom_point(aes(x = respfa2, y = PG, color=gen),size=2)+
+  geom_vline(xintercept = 0,linetype="dashed", colour = "black")+
+  geom_hline(yintercept = 0,linetype="dashed")+
+  ylab("Performance geral") + 
+  scale_x_continuous(name = "Responsividade ao segundo fator",
+                     limits = c(-1.5,1.5))+
+  labs(color = "Genótipo")
+
+ggplot(data=plot2)+
+  geom_point(aes(x = respfa3, y = PG, color=gen),size=2)+
+  geom_vline(xintercept = 0,linetype="dashed", colour = "black")+
+  geom_hline(yintercept = 0,linetype="dashed")+
+  ylab("Performance geral") + 
+  scale_x_continuous(name = "Responsividade ao terceiro fator", 
+                     limits = c(-1.5,1.5))+
+  labs(color = "Genótipo")
+
+
+ggplot(data=plot2)+
+  geom_point(aes(x = respfa4, y = PG, color=gen),size=2)+
+  geom_vline(xintercept = 0,linetype="dashed", colour = "black")+
+  geom_hline(yintercept = 0,linetype="dashed")+
+  ylab("Performance Geral") + 
+  scale_x_continuous(name = "Responsividade ao quarto fator",
+                     limits = c(-1.5,1.5))+
+  labs(color = "Genótipo")
+
+
+ggplot(data=plot2)+
+  geom_point(aes(x = respfa5, y = PG, color=gen),size=2)+
+  geom_vline(xintercept = 0,linetype="dashed", colour = "black")+
+  geom_hline(yintercept = 0,linetype="dashed")+
+  ylab("Performance Geral") + 
+  scale_x_continuous(name = "Responsividade ao quinto fator",
+                     limits = c(-1.5,1.5))+
+  labs(color = "Genótipo")
+
+
+```
+
