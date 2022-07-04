@@ -1,2 +1,2 @@
-# Cod_Pinus
-Códigos utilizados para os exemplos do capítulo "Análise de dados no melhoramento do Pinus"
+# Análise de dados no melhoramento do Pinus
+Esta página possui os scripts dos exemplos abordados no capítulo "Análise de dados no melhoramento do Pinus"
