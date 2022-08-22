@@ -1,5 +1,5 @@
 ---
-title: "Ensaios em múltiplos ambientais"
+title: "Análise de Dados no Melhoramento Genético de Pinus"
 output:
   html_document:
     toc: yes
@@ -51,7 +51,7 @@ write_matex2 <- function(x) {
 }
 ```
 
-Neste documento estão os scripts para as análises abordadas no tópico "Ensaios em múltiplos ambientes". 
+Neste documento estão os scripts para as análises abordadas no capítulo "Análise de Dados no Melhoramento Genético de Pinus". 
 
 # Pacotes necessários
 
@@ -74,31 +74,182 @@ require(ComplexHeatmap)
 require(RColorBrewer)
 ```
 
-# Modelagem das estruturas de covariância
+# 1. Análise individual (somente um ambiente)
 
 ## Carregando o conjunto de dados
 
+Para realizar as análises individuais, utilizaremos somente o primeiro ambiente do conjunto de dados disponibilizados.
+
 ```{r message=FALSE, warning=FALSE,class.source="bg-primary",include=TRUE}
-data1 = read.table("EstCov.txt", header = T)
+data = read.table("EstCov.txt", header = T)
 
-data1$amb = as.factor(data1$amb)
-data1$gen = as.factor(data1$gen)
-data1$rept = as.factor(data1$rept)
-
+data_e1 = data %>% filter(amb == "E1") %>% select(gen, rept,y)
+data_e1$gen = as.factor(data_e1$gen)
+data_e1$rept = as.factor(data_e1$rept)
 ```
+
+O experimento consiste em 15 tratamentos delineados em 10 blocos completos casualizados. Perceba a presença de dados perdidos (NA) no conjunto de dados. Isso não será problema para a execução da análise.
 
 ```{r eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE}
-data1 %>% kbl(escape = F, align = 'c') %>% 
+
+data_e1 %>% kbl(escape = F, align = 'c',col.names = c("Genótipo","Repetição","Variável")) %>% 
   kable_paper("hover",full_width = T, position="center") %>% scroll_box(height = '300px')
+ 
 ```
 
-## Modelo 1: Simetria composta para genótipo e identidade para resíduo
+## Modelo para análise dos dados
+
+```{r message=FALSE, warning=FALSE,eval=TRUE,class.source="bg-primary",include=TRUE, results='hide'}
+
+m = asreml(fixed = y ~ rept,
+            random = ~ gen,
+            data = data_e1)
+summary(m)$varcomp
+```
+```{r eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE}
+sum1 = summary(m)$varcomp
+
+rownames(sum1) = c("$\\sigma^2_g$", "$\\sigma^2_e$")
+
+sum1[,1:3] %>% kbl(escape = F, align = 'c', col.names = c("Componente", "Erro-Padrão","Z-Ratio")) %>% 
+  kable_paper("hover",full_width = T, position="center")
+
+```
+
+## Teste de significância: Likelihood ratio test (LRT)
+
+Uma vez construído o modelo, é necessário determinar a significância do efeito de tratamentos. Isto é realizado utilizando o teste de deviance ou Likelihood Ratio Test (LRT). Para isto, devemos construir o modelo reduzido, isto é, sem efeito a ser testado. Com o modelo reduzido em mãos, o próprio ASReml encarrega-se de calcular o LRT utilizando a função "lrt".
+
+```{r message=FALSE, warning=FALSE,eval=TRUE,class.source="bg-primary",include=TRUE, results='hide'}
+
+mr = asreml(fixed = y ~ rept,
+            data = data_e1)
+
+lrt(m,mr)
+```
+```{r eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE}
+
+lrt(m,mr)
+
+```
+
+Veja que o p-valor [Pr(Chisq)] é menor que 0.05, portanto o efeito em teste é significativo.
+
+## Acurácia e herdabilidade
+
+Uma vez aferida a significância, podemos calcular alguns parâmetros genéticos, como a acurácia e a herdabilidade. Para isto, utilizaremos as seguintes fórmulas:
+
+* Acurácia [(Mrode, 2014)](https://cabidigitallibrary.org/doi/book/10.1079/9781780643915.0000)
+
+$$r = \sqrt{1-\frac{PEV}{\sigma^2_g}}$$
+em que PEV é a variância do erro de predição, obtida da diagonal da matriz de coeficientes da equação de modelos mistos
+
+* Herdabilidade individual
+
+$$H^2 = \frac{\sigma^2_g}{\sigma^2_g + \sigma^2_e}$$
+
+* Herdabilidade média (fórmula padrão)
+
+$$H^2_p = \frac{\sigma^2_g}{\sigma^2_g + \frac{\sigma^2_e}{r}}$$
+em que r é o número de repetições 
+
+* Herdabilidade média [(Cullis et al., 2006)](https://link.springer.com/article/10.1198/108571106X154443)
+
+$$H^2_c = 1- \frac{\overline{V}(\Delta)}{2\sigma^2_g}$$
+em que $\overline{V}(\Delta)$ é a variância média da diferença entre dois BLUPs
+
+Para estimar $r$ e $H_c$, utilizaremos a função "predict" do ASReml. Esta função também servirá para obtenção dos BLUPs
+
+```{r message=FALSE, warning=FALSE,eval=TRUE,class.source="bg-primary",include=TRUE, results='hide'}
+
+predm_sed = predict(m,"gen", sed = T)
+predm_vcov = predict(m, "gen", vcov = T)
+
+PEV = mean(diag(predm_vcov$vcov))
+Acurácia = sqrt(1-(PEV/summary(m)$varcomp[grep("gen",rownames(summary(m)$varcomp)),1]))
+
+Herdabilidade_ind = summary(m)$varcomp[grep("gen",rownames(summary(m)$varcomp)),1] / 
+  (sum(summary(m)$varcomp[,1]))
+
+Herdabilidade_med_pad = summary(m)$varcomp[grep("gen",rownames(summary(m)$varcomp)),1] /
+  (summary(m)$varcomp[grep("gen",rownames(summary(m)$varcomp)),1] +
+     (summary(m)$varcomp[grep("R",rownames(summary(m)$varcomp)),1]/10))
+
+MVdelta = mean((predm_sed$sed^2)[upper.tri(predm_sed$sed^2, diag = F)])
+Herdabilidade_med_cullis = 1-(MVdelta)/
+  (2*summary(m)$varcomp[grep("gen",rownames(summary(m)$varcomp)),1])
+
+```
+```{r eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE}
+data.frame("Parâmetro" = c("r", "$H^2$", "$H^2_p$","$H^2_c$"),
+           "Valor" = c(Acurácia, Herdabilidade_ind, Herdabilidade_med_pad,Herdabilidade_med_cullis)) %>% kbl(escape = F, align = 'c') %>% 
+  kable_paper("hover",full_width = T, position="center")
+```
+
+Veja que $H^2_p$ e $H^2_c$ são diferentes, ainda que ambos indiquem a herdabilidade média no banco de dados. Isto ocorre devido ao desbalanceamento, que, no exemplo acima, é devido à perda de dados. $H^2_p$ é uma fórmula proposta para quando os dados são balanceados e, por vezes, pode distorcer o valor real da herdabilidade média. Além de $H^2_c$, existem outras alternativas que podem ser utilizadas quando os dados são desbalanceados. O leitor pode encontrá-las em [Schmidt et al. (2019a)](https://doi.org/10.2135/cropsci2018.06.0376) e [Schmidt et al. (2019b)](https://doi.org/10.1534/genetics.119.302134).
+
+## BLUPs
+
+Ainda utilizando a função "predict", obteremos os BLUPs, ou valores genotípicos, dos tratamentos em análise. Com eles, realizaremos a seleção e calcularemos os ganhos genéticos estimados:
+
+$$Ganho = \frac{BLUP_s - \mu}{\mu} \times 100$$
+em que $BLUP_s$ é a média dos BLUPs dos genótipos selecionados e $\mu$ é a média do experimento.
+No exemplo, selecionamos os cinco melhores tratamentos.
+
+```{r message=FALSE, warning=FALSE,eval=TRUE,class.source="bg-primary",include=TRUE, results='hide'}
+
+predm_sed = predict(m,"gen", sed = T)
+predm_vcov = predict(m, "gen", vcov = T)
+
+BLUP = predm_sed$pvals
+
+BLUP = BLUP %>% arrange(desc(predicted.value))
+
+BLUPs = BLUP[1:5,]
+
+Ganho = (mean(BLUPs$predicted.value) - mean(BLUP$predicted.value)) /
+  mean(BLUP$predicted.value) * 100
+
+```
+```{r eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE}
+BLUP[,1:3] %>% kbl(escape = F, align = 'c', col.names = c("Genótipo","BLUP","Erro padrão")) %>% 
+  kable_paper("hover",full_width = T, position="center")
+```
+
+$$BLUPs = \frac{15.367+15.130+14.833+14.326+14.286}{5} =14.789 $$
+
+$$Ganho = \frac{14.789-13.539}{13.539}\times100 = 9.226\%$$
+
+# 2. Análise conjunta (múltiplos ambientes)
+
+## Carregando o conjunto de dados
+
+Desta vez utilizaremos todo o conjunto de dados disponibilizados.
+
+```{r message=FALSE, warning=FALSE,class.source="bg-primary",include=TRUE}
+data$amb = as.factor(data$amb)
+data$gen = as.factor(data$gen)
+data$rept = as.factor(data$rept)
+```
+
+Agora temos 15 tratamentos delineados em 10 blocos completos casualizados em 4 ambientes.
+
+```{r eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE}
+
+data %>% kbl(escape = F, align = 'c',col.names = c("Ambiente","Genótipo","Repetição","Variável")) %>% 
+  kable_paper("hover",full_width = T, position="center") %>% scroll_box(height = '300px')
+ 
+```
+
+## Modelagem das estruturas de covariância
+
+### Modelo 1: Simetria composta para genótipo e identidade para resíduo
 
 ```{r message=FALSE, warning=FALSE,eval=TRUE,class.source="bg-primary",include=TRUE, results='hide'}
 
 m1 = asreml(fixed = y ~ rept:amb,
             random = ~gen + gen:amb,
-            data = data1)
+            data = data)
 summary(m1)$varcomp
 ```
 
@@ -113,14 +264,14 @@ sum1[,1:3] %>% kbl(escape = F, align = 'c', col.names = c("Componente", "Erro-Pa
 ```
 
 
-## Modelo 2: Simetria composta para genótipo e bloco diagonal para resíduo
+### Modelo 2: Simetria composta para genótipo e bloco diagonal para resíduo
 
 ```{r message=FALSE, warning=FALSE,eval=TRUE,class.source="bg-primary",include=TRUE, results='hide'}
 
 m2 = asreml(fixed = y ~ rept:amb,
             random = ~gen + gen:amb,
             residual = ~dsum(~id(units)|amb),
-            data = data1)
+            data = data)
 summary(m2)$varcomp
 ```
 
@@ -134,14 +285,14 @@ sum2[,1:3] %>% kbl(escape = F, align = 'c', col.names = c("Componente", "Erro-Pa
 
 ```
 
-## Modelo 3: Simetria composta heterogênea para genótipo e bloco diagonal para resíduo
+### Modelo 3: Simetria composta heterogênea para genótipo e bloco diagonal para resíduo
 
 ```{r message=FALSE, warning=FALSE,eval=TRUE,class.source="bg-primary",include=TRUE, results='hide'}
 
 m3 = asreml(fixed = y ~ rept:amb,
             random = ~corh(amb):gen,
             residual = ~dsum(~id(units)|amb),
-            data = data1)
+            data = data)
 summary(m3)$varcomp
 ```
 
@@ -156,14 +307,14 @@ sum3[,1:3] %>% kbl(escape = F, align = 'c', col.names = c("Componente", "Erro-Pa
 ```
 
 
-## Modelo 4: Estrutura multivariada para genótipo e bloco diagonal para resíduo
+### Modelo 4: Estrutura multivariada para genótipo e bloco diagonal para resíduo
 
 ```{r message=FALSE, warning=FALSE,eval=TRUE,class.source="bg-primary",include=TRUE, results='hide'}
 
 m4 = asreml(fixed = y ~ rept:amb,
             random = ~us(amb):gen,
             residual = ~dsum(~id(units)|amb),
-            data = data1)
+            data = data)
 summary(m4)$varcomp
 ```
 
@@ -178,7 +329,7 @@ sum4[,1:3] %>% kbl(escape = F, align = 'c', col.names = c("Componente", "Erro-Pa
 ```
 
 
-## Seleção do modelo
+### Seleção do modelo
 
 ```{r message=FALSE, warning=FALSE,eval=TRUE,class.source="bg-primary",include=TRUE, results='hide'}
 
@@ -196,14 +347,15 @@ data.frame("Modelo" = seq(1,4),
 O modelo 4 possui o menor AIC e, portanto, o melhor ajuste.
 
 
-# Modelos Fator Analítico Multiplicativo Misto
+## Modelo Fator Analítico Multiplicativo Misto
 
-## Carregando o conjunto de dados
+### Carregando o conjunto de dados
 
 Neste exemplo, utilizamos o conjunto de dados presente neste [link](https://github.com/Kaio-Olimpio/Probability-for-GEI/blob/master/maize_dataset.csv)
 
 ```{r message=FALSE, warning=FALSE,class.source="bg-primary",include=TRUE}
-dataset = read.csv("https://raw.githubusercontent.com/Kaio-Olimpio/Probability-for-GEI/master/maize_dataset.csv", sep = ",")
+dataset = read.csv("https://raw.githubusercontent.com/Kaio-Olimpio/Probability-for-GEI/master/maize_dataset.csv", 
+                   sep = ",")
 
 dataset <- transform(dataset, env = factor(Location), gen = factor(Hybrid), rept = factor(Rep), 
                      block = factor(Block))
@@ -220,7 +372,7 @@ name.gen = levels(factor(dataset$gen))
 
 ```
 
-## Seleção do modelo
+### Seleção do modelo
 
 Procuramos um modelo parsimonioso, mas que garanta a explicação de uma grande parte da variação do conjunto de dados. Em termos práticos, adotamos um limite mínimo de 70% em termos de variação explicada pelo modelo. Neste exemplo, já partiremos da estrutura diagonal para os efeitos residuais.
 
@@ -334,9 +486,9 @@ fit %>%  kbl(escape = F, align = 'c',col.names = c("Modelo","AIC","Variância ex
 ```
 Dentre os modelos testados, o FA5 possui a maior variância explicada, apesar do maior valor de AIC. Prosseguiremos com a utilização deste modelo para as demais etapas.
 
-## Obtenção da matriz de covariâncias genéticas
+### Obtenção da matriz de covariâncias genéticas
 
-### Matriz de cargas fatoriais 
+#### Matriz de cargas fatoriais 
 
 ```{r message=FALSE, warning=FALSE, class.source="bg-primary", include=TRUE, echo=TRUE}
 
@@ -371,7 +523,7 @@ $$\boldsymbol \Lambda = \begin{bmatrix}
 \end{bmatrix}$$
 
 
-### Rotação da matriz de cargas fatoriais
+#### Rotação da matriz de cargas fatoriais
 ```{r message=FALSE, warning=FALSE, class.source="bg-primary", include=TRUE, echo=TRUE}
 
 svdmat = svd(mat.loadings5)
@@ -399,7 +551,7 @@ $$\boldsymbol \Lambda^* = \begin{bmatrix}
 0.253&-0.081&-0.379&0.341&0.033 \\
 \end{bmatrix}$$
 
-### Matriz de variâncias específicas
+#### Matriz de variâncias específicas
 
 ```{r message=FALSE, warning=FALSE, class.source="bg-primary", include=TRUE, echo=TRUE}
 
@@ -426,7 +578,7 @@ $$\boldsymbol \Psi=\begin{bmatrix}
 0&0&0&0&0&0&0&0&0&0&0&0&0&0&0&0.347 \\
 \end{bmatrix}$$
 
-### Matriz de covariâncias genéticas
+#### Matriz de covariâncias genéticas
 
 ```{r message=FALSE, warning=FALSE, class.source="bg-primary", include=TRUE, echo=TRUE}
 
@@ -453,7 +605,7 @@ $$\boldsymbol \Sigma_g = \begin{bmatrix}
 0.115&0.232&0.246&0.217&0.256&-0.268&0.324&0.074&0.107&-0.09&0.074&0.026&0.083&0.303&0.295&0.679 \\
 \end{bmatrix}$$
 
-## Correlações genéticas entre ambientes
+### Correlações genéticas entre ambientes
 ```{r message=FALSE, warning=FALSE, class.source="bg-primary", include=TRUE, echo=TRUE}
 
 rownames(gencov) = colnames(gencov) = name.env
@@ -473,9 +625,9 @@ Heatmap(corr,col=colorRampPalette(brewer.pal(8, "YlOrBr"))(25),
 ```
 
 
-## Obtenção dos EBLUPs
+### Obtenção dos EBLUPs
 
-### Vetor de escores fatoriais
+#### Vetor de escores fatoriais
 
 ```{r message=FALSE, warning=FALSE, class.source="bg-primary", include=TRUE, echo=TRUE}
 
@@ -514,7 +666,7 @@ $$\boldsymbol f = \begin{bmatrix}
 -2.245 \\
 \end{bmatrix}$$
 
-### Rotação do vetor de escores fatoriais 
+#### Rotação do vetor de escores fatoriais 
 
 ```{r message=FALSE, warning=FALSE, class.source="bg-primary", include=TRUE, echo=TRUE}
 
@@ -545,7 +697,7 @@ $$\boldsymbol f^* = \begin{bmatrix}
 -1.922 \\
 \end{bmatrix}$$
 
-### EBLUPs marginais
+#### EBLUPs marginais
 
 ```{r message=FALSE, warning=FALSE, class.source="bg-primary", include=TRUE, echo=TRUE}
 
@@ -560,7 +712,7 @@ EBLUPs_marg = data.frame("Environment" = rep(name.env,each = num.gen),
 ```
 
 
-## Regressões latentes
+### Regressões latentes
 
 ```{r message=FALSE, warning=FALSE, class.source="bg-primary",echo=TRUE, dev='svg'}
 
@@ -653,11 +805,11 @@ lambda[2]^'*' * f[2]^'*' + lambda[3]^'*' * f[3]^'*' +
   labs(color = "Genótipo",title = "EBLUP x Cargas do quinto fator")
 ```
 
-## Ferramentas de seleção
+### Ferramentas de seleção
 
-### Performance geral x Estabilidade
+#### Performance geral x Estabilidade
 
-Os limites para seleção dos genótipos fica a critério do melhorista. Neste exemplo, nosso interesse foi selecionar os cinco melhores. Portanto, definimos que fossem destacados os genótipos com a PG maior ou igual a 0.25 e a ST menor ou igual a 0.5
+Os limites para seleção dos genótipos ficam a critério do melhorista. Neste exemplo, nosso interesse foi selecionar os cinco melhores. Portanto, definimos que fossem destacados os genótipos com a PG maior ou igual a 0.25 e a ST menor ou igual a 0.5
 
 ```{r message=FALSE, warning=FALSE, class.source="bg-primary", include=TRUE, echo=TRUE}
 
@@ -685,13 +837,14 @@ ggplot(data=plot1)+
 ```
 
 
-### Performance geral x Responsividade aos fatores
+#### Performance geral x Responsividade aos fatores
 
 ```{r message=FALSE, warning=FALSE, class.source="bg-primary", include=TRUE, echo=TRUE}
 
 mat.loadings5.star.df = as.data.frame(mat.loadings5.star)
 
-colnames(mat.loadings5.star.df) = c("fa1.loadings","fa2.loadings","fa3.loadings","fa4.loadings","fa5.loadings")
+colnames(mat.loadings5.star.df) = c("fa1.loadings","fa2.loadings","fa3.loadings",
+                                    "fa4.loadings","fa5.loadings")
 
 fa2.mednegload = mean(mat.loadings5.star.df[mat.loadings5.star.df$fa2.loadings <0,]$fa2.loadings)
 fa3.mednegload = mean(mat.loadings5.star.df[mat.loadings5.star.df$fa3.loadings <0,]$fa3.loadings)
