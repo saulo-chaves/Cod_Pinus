@@ -1,13 +1,9 @@
 ---
 title: "Análise de Dados no Melhoramento Genético de Pinus"
+always_allow_html: true
 output:
-  html_document:
+  word_document:
     toc: yes
-    toc_float: yes
-    theme: flatly
-    highlight: haddock
-    fig_width: 10
-    fig_height: 8
 ---
 
 ```{=html}
@@ -90,13 +86,6 @@ data_e1$rept = as.factor(data_e1$rept)
 
 O experimento consiste em 15 tratamentos delineados em 10 blocos completos casualizados. Perceba a presença de dados perdidos (NA) no conjunto de dados. Isso não será problema para a execução da análise.
 
-```{r eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE}
-
-data_e1 %>% kbl(escape = F, align = 'c',col.names = c("Genótipo","Repetição","Variável")) %>% 
-  kable_paper("hover",full_width = T, position="center") %>% scroll_box(height = '300px')
- 
-```
-
 ## Modelo para análise dos dados
 
 ```{r message=FALSE, warning=FALSE,eval=TRUE,class.source="bg-primary",include=TRUE, results='hide'}
@@ -105,15 +94,6 @@ m = asreml(fixed = y ~ rept,
             random = ~ gen,
             data = data_e1)
 summary(m)$varcomp
-```
-```{r eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE}
-sum1 = summary(m)$varcomp
-
-rownames(sum1) = c("$\\sigma^2_g$", "$\\sigma^2_e$")
-
-sum1[,1:3] %>% kbl(escape = F, align = 'c', col.names = c("Componente", "Erro-Padrão","Z-Ratio")) %>% 
-  kable_paper("hover",full_width = T, position="center")
-
 ```
 
 ## Teste de significância: Likelihood ratio test (LRT)
@@ -180,6 +160,7 @@ Herdabilidade_med_cullis = 1-(MVdelta)/
   (2*summary(m)$varcomp[grep("gen",rownames(summary(m)$varcomp)),1])
 
 ```
+
 ```{r eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE}
 data.frame("Parâmetro" = c("r", "$H^2$", "$H^2_p$","$H^2_c$"),
            "Valor" = c(Acurácia, Herdabilidade_ind, Herdabilidade_med_pad,Herdabilidade_med_cullis)) %>% kbl(escape = F, align = 'c') %>% 
@@ -211,10 +192,6 @@ Ganho = (mean(BLUPs$predicted.value) - mean(BLUP$predicted.value)) /
   mean(BLUP$predicted.value) * 100
 
 ```
-```{r eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE}
-BLUP[,1:3] %>% kbl(escape = F, align = 'c', col.names = c("Genótipo","BLUP","Erro padrão")) %>% 
-  kable_paper("hover",full_width = T, position="center")
-```
 
 $$BLUPs = \frac{15.367+15.130+14.833+14.326+14.286}{5} =14.789 $$
 
@@ -234,12 +211,6 @@ data$rept = as.factor(data$rept)
 
 Agora temos 15 tratamentos delineados em 10 blocos completos casualizados em 4 ambientes.
 
-```{r eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE}
-
-data %>% kbl(escape = F, align = 'c',col.names = c("Ambiente","Genótipo","Repetição","Variável")) %>% 
-  kable_paper("hover",full_width = T, position="center") %>% scroll_box(height = '300px')
- 
-```
 
 ## Modelagem das estruturas de covariância
 
@@ -253,17 +224,6 @@ m1 = asreml(fixed = y ~ rept:amb,
 summary(m1)$varcomp
 ```
 
-```{r eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE}
-sum1 = summary(m1)$varcomp
-
-rownames(sum1) = c("$\\sigma^2_g$", "$\\sigma^2_{ga}$", "$\\sigma^2_e$")
-
-sum1[,1:3] %>% kbl(escape = F, align = 'c', col.names = c("Componente", "Erro-Padrão","Z-Ratio")) %>% 
-  kable_paper("hover",full_width = T, position="center")
-
-```
-
-
 ### Modelo 2: Simetria composta para genótipo e bloco diagonal para resíduo
 
 ```{r message=FALSE, warning=FALSE,eval=TRUE,class.source="bg-primary",include=TRUE, results='hide'}
@@ -275,16 +235,6 @@ m2 = asreml(fixed = y ~ rept:amb,
 summary(m2)$varcomp
 ```
 
-```{r eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE}
-sum2 = summary(m2)$varcomp
-
-rownames(sum2) = c("$\\sigma^2_g$", "$\\sigma^2_{ga}$", "$\\sigma^2_{e1}$","$\\sigma^2_{e2}$","$\\sigma^2_{e3}$","$\\sigma^2_{e4}$")
-
-sum2[,1:3] %>% kbl(escape = F, align = 'c', col.names = c("Componente", "Erro-Padrão","Z-Ratio")) %>% 
-  kable_paper("hover",full_width = T, position="center")
-
-```
-
 ### Modelo 3: Simetria composta heterogênea para genótipo e bloco diagonal para resíduo
 
 ```{r message=FALSE, warning=FALSE,eval=TRUE,class.source="bg-primary",include=TRUE, results='hide'}
@@ -294,16 +244,6 @@ m3 = asreml(fixed = y ~ rept:amb,
             residual = ~dsum(~id(units)|amb),
             data = data)
 summary(m3)$varcomp
-```
-
-```{r eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE}
-sum3 = summary(m3)$varcomp
-
-rownames(sum3) = c("$\\rho$","$\\sigma^2_{g1}$", "$\\sigma^2_{g2}$","$\\sigma^2_{g3}$","$\\sigma^2_{g4}$", "$\\sigma^2_{e1}$","$\\sigma^2_{e2}$","$\\sigma^2_{e3}$","$\\sigma^2_{e4}$")
-
-sum3[,1:3] %>% kbl(escape = F, align = 'c', col.names = c("Componente", "Erro-Padrão","Z-Ratio")) %>% 
-  kable_paper("hover",full_width = T, position="center")
-
 ```
 
 
@@ -318,32 +258,17 @@ m4 = asreml(fixed = y ~ rept:amb,
 summary(m4)$varcomp
 ```
 
-```{r eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE}
-sum4 = summary(m4)$varcomp
-
-rownames(sum4) = c("$\\sigma^2_{g1}$","$\\sigma^2_{g12}$","$\\sigma^2_{g2}$","$\\sigma^2_{g13}$","$\\sigma^2_{g23}$","$\\sigma^2_{g3}$","$\\sigma^2_{g14}$","$\\sigma^2_{g24}$","$\\sigma^2_{g34}$","$\\sigma^2_{g4}$","$\\sigma^2_{e1}$","$\\sigma^2_{e2}$","$\\sigma^2_{e3}$","$\\sigma^2_{e4}$")
-
-sum4[,1:3] %>% kbl(escape = F, align = 'c', col.names = c("Componente", "Erro-Padrão","Z-Ratio")) %>% 
-  kable_paper("hover",full_width = T, position="center")
-
-```
-
 
 ### Seleção do modelo
 
 ```{r message=FALSE, warning=FALSE,eval=TRUE,class.source="bg-primary",include=TRUE, results='hide'}
 
 data.frame("Modelo" = seq(1,4),
-           "AIC" = c(summary(m1)$aic,summary(m2)$aic,summary(m3)$aic,summary(m4)$aic))
+           "AIC" = c(summary(m1)$aic,summary(m2)$aic,summary(m3)$aic,
+                     summary(m4)$aic))
 
 ```
 
-```{r eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE}
-data.frame("Modelo" = seq(1,4),
-           "AIC" = c(summary(m1)$aic,summary(m2)$aic,summary(m3)$aic,summary(m4)$aic)) %>% kbl(escape = F, align = 'c', col.names = c("Modelo", "AIC")) %>% 
-  kable_paper("hover",full_width = T, position="center")
-
-```
 O modelo 4 possui o menor AIC e, portanto, o melhor ajuste.
 
 
@@ -359,11 +284,6 @@ dataset = read.csv("https://raw.githubusercontent.com/Kaio-Olimpio/Probability-f
 
 dataset <- transform(dataset, env = factor(Location), gen = factor(Hybrid), rept = factor(Rep), 
                      block = factor(Block))
-dataset[,1:6] %>% kbl(align = "c", longtable = T, 
-                      col.names = c("Região","Local","Rept",
-                                    "Bloco","Híbrido", "GY")) %>%
-  kable_styling(c("striped", "hover"), full_width = F, position = "center") %>%
-  scroll_box(height = "500px")
 
 num.env = nlevels(factor(dataset$env))
 num.gen = nlevels(factor(dataset$gen))
@@ -450,7 +370,8 @@ fa1.loadings = sum4[grep('fa1', rownames(sum4)),1]
 fa2.loadings = sum4[grep('fa2', rownames(sum4)),1]
 fa3.loadings = sum4[grep('fa3', rownames(sum4)),1]
 fa4.loadings = sum4[grep('fa4', rownames(sum4)),1]
-mat.loadings4 = as.matrix(cbind(fa1.loadings, fa2.loadings,fa3.loadings,fa4.loadings))
+mat.loadings4 = as.matrix(cbind(fa1.loadings, fa2.loadings,fa3.loadings,
+                                fa4.loadings))
 spvar = as.matrix(diag(sum4[grep("var",row.names(sum4)),1]))
 lamblamb = mat.loadings4 %*% t(mat.loadings4)
 expvar4 = (sum(diag(lamblamb))/sum(diag(lamblamb + spvar)))*100
@@ -480,9 +401,7 @@ expvar5.star = (sum(diag(lamblamb.star))/sum(diag(lamblamb.star + spvar)))*100
 fit = data.frame("Model" = c('FA1', 'FA2','FA3','FA4','FA5'),
                  'AIC' = c(aicm1, aicm2, aicm3, aicm4, aicm5),
                  'ExpVar.Star' = c(expvar1, expvar2.star,expvar3.star,expvar4.star,expvar5.star))
-fit %>%  kbl(escape = F, align = 'c',col.names = c("Modelo","AIC","Variância explicada (%)")) %>% 
-  kable_paper("hover",full_width = T, position="center", fixed_thead = T)
-
+fit
 ```
 Dentre os modelos testados, o FA5 possui a maior variância explicada, apesar do maior valor de AIC. Prosseguiremos com a utilização deste modelo para as demais etapas.
 
@@ -644,8 +563,9 @@ names(fa4.scores) = sub("fa(env, 4)_Comp4:gen_","",names(fa4.scores),fixed=T)
 fa5.scores = coef5[grep("Comp4",row.names(coef5)),1];
 names(fa5.scores) = sub("fa(env, 4)_Comp4:gen_","",names(fa5.scores),fixed=T)
 
-fa.scores = rbind(as.matrix(fa1.scores),as.matrix(fa2.scores),as.matrix(fa3.scores),
-                  as.matrix(fa4.scores),as.matrix(fa5.scores))
+fa.scores = rbind(as.matrix(fa1.scores),as.matrix(fa2.scores),
+                  as.matrix(fa3.scores),as.matrix(fa4.scores),
+                  as.matrix(fa5.scores))
 
 ```
 
@@ -704,10 +624,7 @@ $$\boldsymbol f^* = \begin{bmatrix}
 EBLUPs_marg = (kronecker(mat.loadings5.star,diag(num.gen))) %*% fa.scores.star 
 EBLUPs_marg = data.frame("Environment" = rep(name.env,each = num.gen),
                          "Gen" = rep(name.gen,num.env),
-                         "EBLUP_marg" = EBLUPs_marg);EBLUPs_marg %>% 
-  kbl(escape = F, align = 'c',col.names = c("Ambiente","Genótipo","EBLUP marginal")) %>% 
-  kable_paper("hover",full_width = T, position="center", fixed_thead = T) %>%
-  scroll_box(height = "500px")
+                         "EBLUP_marg" = EBLUPs_marg)
 
 ```
 
@@ -908,6 +825,155 @@ ggplot(data=plot2)+
                      limits = c(-1.5,1.5))+
   labs(color = "Genótipo")
 
+
+```
+
+
+# 3. Análise espacial
+
+## Carregando o conjunto de dados
+
+Para realizar as análises individuais, utilizaremos o conjunto de dados entitulado "espacial.csv"
+
+```{r message=FALSE, warning=FALSE,class.source="bg-primary",include=TRUE}
+data_esp = read.csv("espacial.csv", header = T,sep=";")
+
+data_esp$Variety = as.factor(data_esp$Variety)
+data_esp$Block = as.factor(data_esp$Block)
+data_esp$Row = as.factor(data_esp$Row)
+data_esp$Col= as.factor(data_esp$Col)
+
+
+```
+
+
+## Carregando a função para calcular o AIC ajustado ($AIC_c$)
+
+Esta função foi contruída por [Verbyla (2018)](https://doi.org/10.1111/anzs.12254)
+
+```{r message=FALSE, warning=FALSE,class.source="bg-primary",include=TRUE}
+
+icREML <- function(fm, scale=1) {
+    if(!is.list(fm)) stop(" Models need to be in a list\n")
+    if(is.null(names(fm))) namesfm <- paste("fm", 1:length(fm))
+    else namesfm <- names(fm)
+    require(asreml)
+    asreml.options(Cfixed = TRUE, gammaPar=FALSE)
+    fm <- lapply(fm, function(el) {
+        if(is.null(el$Cfixed)) {
+            out <- update(el, maxit=1) }
+        else out <- el
+        out})
+    logl <- lapply(fm, function(el) el$loglik)
+    summ <- lapply(fm, function(el) summary(el, coef=TRUE)$coef.fixed)
+    which.X0 <- lapply(summ, function(el) !is.na(el[, "z.ratio"]))
+    p.0 <- lapply(which.X0, function(el) sum(el))
+    Cfixed <- lapply(fm, function(el) el$Cfixed)
+    logdet <- lapply(1:length(fm), function(el, Cfixed, which.X0, scale) {
+        log(prod(svd(as.matrix(scale*Cfixed[[el]][which.X0[[el]], 
+                                                  which.X0[[el]]]))$d))
+    }, Cfixed, which.X0, scale)
+    vparam <- lapply(fm, function(el) summary(el)$varcomp)
+    q.0 <- lapply(vparam, function(el) sum(!(el$bound == "F" | el$bound == "B")))
+    b.0 <- lapply(vparam, function(el) sum(el$bound == "F" | el$bound == "B"))
+    logl <- lapply(1:length(fm), function(el, logl, logdet, p.0) {
+        logl[[el]] - logdet[[el]]/2}, logl, logdet,p.0)
+    aic <- unlist(lapply(1:length(fm), function(el, logl, p.0, q.0) {
+        -2*logl[[el]] + 2*(p.0[[el]] + q.0[[el]])}, logl, p.0, q.0))
+    bic <- unlist(lapply(1:length(fm), function(el, logl, p.0, q.0, fm) {
+        -2*logl[[el]] + log(fm[[el]]$nedf+p.0[[el]])*(p.0[[el]] + q.0[[el]])},
+        logl, p.0, q.0, fm))
+    results <- data.frame(model=namesfm, loglik = unlist(logl), p=unlist(p.0),
+                          q=unlist(q.0), b = unlist(b.0), AIC = aic, BIC = bic, logdet=unlist(logdet))
+    row.names(results) <- 1:dim(results)[1]
+    invisible(results)
+}
+
+```
+
+
+## Modelo 1: Sem ajuste espacial
+
+```{r message=FALSE, warning=FALSE,class.source="bg-primary",include=TRUE}
+
+m1 <- asreml(yield ~ 1,
+              random = ~ Variety + Block,
+              data = data_esp)
+
+plot(varioGram(m1))
+```
+
+
+## Modelo 2: Auto-regressivo
+
+```{r message=FALSE, warning=FALSE,class.source="bg-primary",include=TRUE}
+
+m2 <- asreml(yield ~ 1,
+              random = ~ Variety + Block,
+              residual = ~ ar1(Col):ar1(Row),
+              data = data_esp)
+
+plot(varioGram(m2))
+```
+
+## Modelo 3: Auto-regressivo + Pepita
+
+```{r message=FALSE, warning=FALSE,class.source="bg-primary",include=TRUE}
+
+m3 <- asreml(yield ~ 1,
+              random = ~ Variety + Block + units,
+              residual = ~ ar1(Col):ar1(Row),
+              data = data_esp)
+
+plot(varioGram(m3))
+```
+
+
+## Modelo 4: Anteriores + Aleatório de linha e coluna
+
+```{r message=FALSE, warning=FALSE,class.source="bg-primary",include=TRUE}
+
+m4 <- asreml(yield ~ 1,
+              random = ~ Variety + Block + Row + Col + units,
+              residual = ~ ar1(Col):ar1(Row),
+              data = data_esp)
+m4 <- update(m4)
+
+plot(varioGram(m4))
+```
+
+## Modelo 5: Anteriores + Efeito linear fixo de linha e coluna
+
+```{r message=FALSE, warning=FALSE,class.source="bg-primary",include=TRUE}
+
+m5 <- asreml(yield ~ lin(Row) + lin(Col),
+              random = ~ Variety + Block + Row + Col + units,
+              residual = ~ ar1(Col):ar1(Row),
+              data = data_esp)
+
+plot(varioGram(m5))
+```
+
+## Modelo 6: Anteriores + Spline no sentido da coluna
+
+```{r message=FALSE, warning=FALSE,class.source="bg-primary",include=TRUE}
+
+m6 <- asreml(yield ~ lin(Row) + lin(Col),
+              random = ~ Variety + Block + Row + Col + spl(col) + units,
+              residual = ~ ar1(Col):ar1(Row),
+              data = data_esp)
+
+plot(varioGram(m6))
+```
+
+## $AIC_c$
+
+```{r message=FALSE, warning=FALSE,class.source="bg-primary",include=TRUE}
+
+mods = list(m1=m1, m2=m2, m3=m3, m4=m4, m5=m5, m6=m6)
+
+selection <- icREML(mods)
+selection
 
 ```
 
