@@ -1,3 +1,10 @@
+require(tidyverse)
+require(asreml)
+require(gghighlight)
+require(ComplexHeatmap)
+require(RColorBrewer)
+require(ggrepel)
+
 ## Modelo Fator Analítico Multiplicativo Misto
 
 ### Carregando o conjunto de dados
@@ -345,40 +352,42 @@ plot2 = data.frame("gen" = name.gen,
                    "respfa4" = respfa4,
                    "respfa5" = respfa5)
 
-ggplot(data=plot2)+
+a = ggplot(data=plot2)+
   geom_point(aes(x = respfa2, y = PG, color=gen),size=2)+
   geom_vline(xintercept = 0,linetype="dashed", colour = "black")+
   geom_hline(yintercept = 0,linetype="dashed")+
   ylab("Performance geral") + 
   scale_x_continuous(name = "Responsividade ao segundo fator",
                      limits = c(-1.5,1.5))+
-  labs(color = "Genótipo")
+  labs(color = "Genótipo")+theme(legend.position = 'none')
 
-ggplot(data=plot2)+
+b = ggplot(data=plot2)+
   geom_point(aes(x = respfa3, y = PG, color=gen),size=2)+
   geom_vline(xintercept = 0,linetype="dashed", colour = "black")+
   geom_hline(yintercept = 0,linetype="dashed")+
   ylab("Performance geral") + 
   scale_x_continuous(name = "Responsividade ao terceiro fator", 
                      limits = c(-1.5,1.5))+
-  labs(color = "Genótipo")
+  labs(color = "Genótipo")+theme(legend.position = 'none')
 
 
-ggplot(data=plot2)+
+c = ggplot(data=plot2)+
   geom_point(aes(x = respfa4, y = PG, color=gen),size=2)+
   geom_vline(xintercept = 0,linetype="dashed", colour = "black")+
   geom_hline(yintercept = 0,linetype="dashed")+
   ylab("Performance Geral") + 
   scale_x_continuous(name = "Responsividade ao quarto fator",
                      limits = c(-1.5,1.5))+
-  labs(color = "Genótipo")
+  labs(color = "Genótipo")+theme(legend.position = 'none')
 
 
-ggplot(data=plot2)+
+d = ggplot(data=plot2)+
   geom_point(aes(x = respfa5, y = PG, color=gen),size=2)+
   geom_vline(xintercept = 0,linetype="dashed", colour = "black")+
   geom_hline(yintercept = 0,linetype="dashed")+
   ylab("Performance Geral") + 
   scale_x_continuous(name = "Responsividade ao quinto fator",
                      limits = c(-1.5,1.5))+
-  labs(color = "Genótipo")
+  labs(color = "Genótipo")+theme(legend.position = 'right')
+
+(a+b)/(c+d)
